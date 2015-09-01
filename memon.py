@@ -191,6 +191,7 @@ class MEMon(object):
         parser.add_argument('--prefer-server-time', default=False, help='If you do not trust the client times, you can use the server process time')
         parser.add_argument('--debug', default=False, help='Print debug statements')
         parser.add_argument('--max-notify-count', type=int, default=3, help='Max # of sns notify events per name')
+        parser.add_argument('--poll-count', type=int, default=3, help='Number of times to poll in period')
 
         parser.add_argument('--period', type=int, default=None, help='Config only - how long should the notification period be? (seconds)')
         parser.add_argument('--description', default=None, help='Config only - optional description for event')
@@ -208,7 +209,8 @@ class MEMon(object):
 
             self.send(self.args.name)
         elif self.args.action == 'poll':
-            self.poll()
+            for i in xrange(self.args.poll_count):
+                self.poll()
         elif self.args.action == 'config':
             if not self.args.name:
                 raise Exception('Missing event name')
