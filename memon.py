@@ -10,7 +10,7 @@ from boto.dynamodb2.fields import RangeKey
 import pprint
 
 class Notification:
-    Unknown, Standard, LatePeriod, MissingPeriod = range(0, 4)
+    Unknown, Down, Up, Late, ConfigError = range(0, 5)
 
 class MEMon(object):
 
@@ -22,6 +22,8 @@ class MEMon(object):
         self.sqs = boto.connect_sqs()
         self.sns_conn = boto.connect_sns()
         self.args = None
+        self.pp = pprint.PrettyPrinter()
+        self.now = int(time.time())
     
     def aws_init(self):
         print 'Creating sqs queue %s' % (self.args.queue)
@@ -36,19 +38,22 @@ class MEMon(object):
         print 'Creating sns topic %s' % (self.args.sns)
         self.sns_conn.create_topic(self.args.sns)
         
-        print 'Remember to subscribe to the sns topic %s' % (self.args.sns)
+        if self.args.sns_email:
+            print 'Subscribing %s to the sns topic %s (click confirmation link in email)' % (self.args.sns_email, self.args.sns)
+            self.sns_conn.subscribe(self.get_topic_arn(), 'email', self.args.sns_email)
+        else:
+            print 'Remember to subscribe to the sns topic %s' % (self.args.sns)
 
-    def send(self):
+    def send(self, name):
         q = self.sqs.get_queue(self.args.queue)
         m = RawMessage()
-        body = json.dumps({
-            'name': self.args.name,
-            'time': int(time.time()),
-            'period': int(self.args.add_period)
-        })
+        msg = {
+            'name': name,
+            'time': self.now,
+        }
         if self.args.debug:
-            print body
-        m.set_body(body)
+            self.pp.pprint(msg)
+        m.set_body(json.dumps(msg))
         q.write(m)
 
     def poll(self):
@@ -56,100 +61,142 @@ class MEMon(object):
         results = q.get_messages()
         for result in results:
             msg = json.loads(result.get_body())
-            print msg
-            period = None
-            if 'period' in msg:
-                period = msg['period']
-            self.record(msg['name'], msg['time'], period)
-
+            if self.args.debug:
+                print msg
+            self.record(msg['name'], msg['time'])
             q.delete_message(result)
 
-    def notify(self, name, notification):
+        self.notify_down_events()
+
+    def show(self, name = None):
+        table = Table(self.args.table)
+        results = table.scan()
+        for event in results:
+            if name is None or name == event['Name']:
+                print "\n%s\n---" % (event['Name'])
+                self.pp.pprint(dict(event))
+        print "\n"
+
+    def notify_down_events(self):
+        table = Table(self.args.table)
+        results = table.scan()
+        for event in results:
+            # we only want to notify based on the period, so we're not notifying every minute
+            if event['expected'] + event['error_count'] * event['period'] <= self.now and event['enabled']:
+                if self.args.debug:
+                    print "%s\n---" % (event['Name'])
+                    self.pp.pprint(dict(event))
+                if event['error_count'] < int(self.args.max_notify_count):
+                    self.notify(event['Name'], Notification.Down)
+                elif self.args.debug:
+                    print "Exceeded notify count for %s" % (event['Name'])
+                event['error_count'] = event['error_count'] + 1
+                event.partial_save()            
+
+    def get_topic_arn(self):
         # todo: handle pagination of topics
         topics = self.sns_conn.get_all_topics()['ListTopicsResponse']['ListTopicsResult']['Topics']
         topicArn = None
         for topic in topics:
             if topic['TopicArn'].endswith(':' + self.args.sns):
                 # todo: cache arn
-                topicArn = topic['TopicArn']
+                return topic['TopicArn']
+
+        raise Exception('Unable to locate topic arn for %s' % (self.args.sns))
+
+    def notify(self, name, notification):
+        topicArn = self.get_topic_arn()
 
         message = None
-        if notification == Notification.Standard:
-            message = 'Event %s failed to send' % (name)
-        elif notification == Notification.LatePeriod:
-            message = 'Event %s ran late' % (name)
-        elif notification == Notification.MissingPeriod:
-            message = 'Event %s is missing its notification period' % (name)
+        if notification == Notification.Down:
+            message = 'Down: %s' % (name)
+        elif notification == Notification.Up:
+            message = 'Up: %s' % (name)
+        elif notification == Notification.Late:
+            message = 'Late: %s' % (name)
+        elif notification == Notification.ConfigError:
+            message = 'Config: %s has a configuration error' % (name)
         else:
             raise Exception('Invalid notification type')
 
         if self.args.debug:
             print message
 
-        if topicArn:
-            self.sns_conn.publish(topicArn, message)
-        else:
-            raise Exception('Unable to locate topic arn for %s' % (self.args.sns))
+        subject = "[MEMon] %s" % (message)
+        self.sns_conn.publish(topicArn, message, subject)
 
-    def record(self, name, event_time, period):
+    def record(self, name, event_time):
         table = Table(self.args.table)
         if self.args.prefer_server_time:
-            event_time = time.time()
+            event_time = self.now
+        else:
+            event_time = int(event_time)
+
         try:
             event = table.get_item(True, Name=name)
+
+            if not 'period' in event:
+                return self.notify(name, Notification.ConfigError)
 
             # The possiblity exists that we're processing an older sqs message - if so, we can just ignore it
             if time < event['time']:
                 return
 
-            # Verify db record is setup properly
-            if period and self.args.add_unknown_events:
-                if self.args.debug:
-                    print 'Using cli period'
-                period = period
-            elif 'period' in event:
-                if self.args.debug:
-                    print 'Using db period'
-                period = event['period']
-            else:
-                if self.args.debug:
-                    print 'Missing period'
-                self.notify(name, Notification.MissingPeriod)
-                return
- 
-            if event['expected'] < event_time and event['error_count'] < self.args.max_notify_count:
-                self.notify(name, Notification.LatePeriod)
-            
-            event['time'] = int(event_time)
-            event['expected'] = int(event_time) + int(period)
-            event['error_count'] = 0
-            event['period'] = int(period)
+            if event['expected'] < event_time and event['enabled']:
+                if event['error_count'] == 0:
+                    self.notify(name, Notification.Late)
+                else:
+                    self.notify(name, Notification.Up)
+
+            event['time'] = event_time
+            event['expected'] = event_time + int(event['period'])
+            event['error_count'] = int(0)
             event.partial_save()
         except boto.dynamodb2.exceptions.ItemNotFound as e:
-            if self.args.add_unknown_events and event['period']:
-                table.put_item(data = {
-                    'Name': name,
-                    'time': event_time,
-                    'error_count': 0,
-                    'period': event['period'],
-                    'expected': event_time + period
-                })
-            else:
-                print 'Unknown event %s.  Skipping...' % (name)
+            self.notify(name, Notification.ConfigError)
+            
+    def config(self, name, period):
+        table = Table(self.args.table)
+        try:
+            event = table.get_item(True, Name=name)
+            event['period'] = period
+            event['enabled'] = self.args.enabled
+            if self.args.description:
+                event['description'] = self.args.description
+            event.partial_save()
+        except boto.dynamodb2.exceptions.ItemNotFound as e:
+            # error_count should only be set when adding new items
+            data = {
+                'Name': name,
+                'period': period,
+                'enabled': self.args.enabled,
+                'error_count': 0
+            }
+            if self.args.description:
+                data['description'] = self.args.description
+
+            table.put_item(data)
+            
+        self.show(name)
 
     def main(self):
 
         parser = argparse.ArgumentParser(description='Missing Event Monitor')
-        parser.add_argument('action', choices=['init', 'send', 'poll'], help='Action to perform')
-        parser.add_argument('name', nargs='?', help='Event name (required for send)')
+        parser.add_argument('action', choices=['init', 'send', 'poll', 'config', 'show'], help='Action to perform')
+        parser.add_argument('name', nargs='?', help='Event name (required for send and config)')
         parser.add_argument('--queue', default=self.queue, nargs='?', help='MEMon SQS Name (default: %(default)s)')
         parser.add_argument('--table', default=self.table, nargs='?', help='MEMon DynamoDb Table Name (default: %(default)s)')
         parser.add_argument('--sns', default=self.sns, nargs='?', help='MEMon SNS Topic Name (default: %(default)s)')
+        parser.add_argument('--sns-email', help='Init only - Subscribe email to sns notifications')
         parser.add_argument('--prefer-server-time', default=False, help='If you do not trust the client times, you can use the server process time')
-        parser.add_argument('--add-unknown-events', default=False, help='Should new events, automatically be added?')
         parser.add_argument('--debug', default=False, help='Print debug statements')
-        parser.add_argument('--add-period', type=int, default=300, help='If adding new events, how long should the notification period be? (seconds)')
         parser.add_argument('--max-notify-count', type=int, default=3, help='Max # of sns notify events per name')
+
+        parser.add_argument('--period', type=int, default=None, help='Config only - how long should the notification period be? (seconds)')
+        parser.add_argument('--description', default=None, help='Config only - optional description for event')
+        parser.add_argument('--enabled', dest='enabled', action='store_true', help='Config only - enable/disable event')
+        parser.add_argument('--disabled', dest='enabled', action='store_false', help='Config only - enable/disable event')
+
         self.args = parser.parse_args()
 
         if self.args.action == 'init':
@@ -157,10 +204,17 @@ class MEMon(object):
         elif self.args.action == 'send':                
             if not self.args.name:
                 raise Exception('Missing event name')
-        
-            self.send()
+
+            self.send(self.args.name)
         elif self.args.action == 'poll':
             self.poll()
+        elif self.args.action == 'config':
+            if not self.args.name:
+                raise Exception('Missing event name')
+
+            self.config(self.args.name, self.args.period)
+        elif self.args.action == 'show':
+            self.show()
         else:
             raise Exception('Unknown action')
 
