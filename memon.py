@@ -82,7 +82,7 @@ class MEMon(object):
         results = table.scan()
         for event in results:
             # we only want to notify based on the period, so we're not notifying every minute
-            if event['expected'] + event['error_count'] * event['period'] <= self.now and event['enabled']:
+            if 'expected' in event and event['expected'] + event['error_count'] * event['period'] <= self.now and event['enabled']:
                 if self.args.debug:
                     print "%s\n---" % (event['Name'])
                     self.pp.pprint(dict(event))
@@ -196,6 +196,7 @@ class MEMon(object):
         parser.add_argument('--description', default=None, help='Config only - optional description for event')
         parser.add_argument('--enabled', dest='enabled', action='store_true', help='Config only - enable/disable event')
         parser.add_argument('--disabled', dest='enabled', action='store_false', help='Config only - enable/disable event')
+        parser.set_defaults(enabled=True)
 
         self.args = parser.parse_args()
 
