@@ -58,7 +58,7 @@ class MEMon(object):
 
     def poll(self):
         q = self.sqs.get_queue(self.args.queue)
-        results = q.get_messages()
+        results = q.get_messages(10)
         for result in results:
             msg = json.loads(result.get_body())
             if self.args.debug:
