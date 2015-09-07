@@ -123,6 +123,7 @@ class MEMon(object):
             print message
 
         subject = "[MEMon] %s" % (message)
+        message = "MEMon Alert\n-----------\n\n%s\n\n--\nMEMon" % (message)
         self.sns_conn.publish(topicArn, message, subject)
 
     def record(self, name, event_time):
