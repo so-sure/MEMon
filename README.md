@@ -14,6 +14,10 @@ as check for any events that haven't run in the timeperiod expected.  Notificati
 Remember to include an additional ~90 seconds in the period to account for the sqs + polling times and also account for variations
 in the process runtime if that's likely.
 
+Status
+---
+MEMon is in alpha and subject to quite a bit of change.  We hope to be more stable towards end of 2015.
+
 Requires:
 --
 AWS SQS
@@ -47,18 +51,22 @@ set -e
 /usr/local/bin/memon.py send **NAME**
 ```
 
-On 1 server **Requires IAM permissions to send to SQS Queue**
+On 1 server
 --
+**Requires IAM permissions to send to SQS Queue**
+
 crontab
+```
 * * * * * /usr/local/bin/memon.py poll
+```
 
 DynamoDb Schema
 --
-HashKey (string): Name
-(int): error_count (# of notifications sent)
-(int): expected (time (epoch) of when the next run should be completed by = time + period)
-(int): period (how often the process is expected to run in seconds)
-(int): time (last successfully time (epoch) ran)
+* HashKey (string): Name
+* (int): error_count (# of notifications sent)
+* (int): expected (time (epoch) of when the next run should be completed by = time + period)
+* (int): period (how often the process is expected to run in seconds)
+* (int): time (last successfully time (epoch) ran)
 
 Future work
 --
