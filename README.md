@@ -31,7 +31,7 @@ Install:
 --
 Download MEMon
 ```
-wget -o /usr/local/bin/memon.py https://raw.github.com/PeerJ/MEMon/master/memon.py
+wget -O /usr/local/bin/memon.py https://raw.github.com/PeerJ/MEMon/master/memon.py
 chmod 755 /usr/local/bin/memon.py
 ```
 
