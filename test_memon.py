@@ -342,6 +342,21 @@ class TestMEMon(unittest.TestCase):
         self.assertEqual(0, len(httpretty.last_request().body))
 
     @mock_sns
+    def test_new_event_no_alert(self):
+        self.initSns()
+        self.table.new_item(hash_key='Test', attrs=self.TEST).put()
+
+        event = self.table.get_item(hash_key='Test')
+        self.assertFalse('LastBlockTime' in event)
+        self.assertFalse('NextBlockTime' in event)
+        self.assertFalse('LastSuccessTime' in event)
+
+        self.memon.notify_down_events()
+
+        # empty body request - presumably from the sns subscription
+        self.assertEqual(0, len(httpretty.last_request().body))
+
+    @mock_sns
     def test_down_notify(self):
         self.initSns()
         self.table.new_item(hash_key='Down', attrs=self.DOWN).put()
@@ -365,6 +380,10 @@ class TestMEMon(unittest.TestCase):
         event = self.table.get_item(hash_key='Blank')
         event['Enabled'] = 1
         event['Type'] = 'rolling'
+        event['Period'] = 1
+        event['LastBlockTime'] = self.memon.now - event['Period']
+        event['NextBlockTime'] = self.memon.now - 1
+        event['LastSuccessTime'] = self.memon.now - 1
         event.save()
         self.assertTrue('ErrorCount' not in event)
 
