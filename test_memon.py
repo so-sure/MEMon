@@ -173,6 +173,7 @@ class TestMEMon(unittest.TestCase):
         self.assertEquals(PeriodType.Fixed, event['Type'])
         self.assertEquals('desc2', event['Description'])
         self.assertEquals(int(dt.strftime('%s')), event['NextBlockTime'])
+        self.assertEquals(event['NextBlockTime'] - event['Period'], event['LastBlockTime'])
 
     def test_config_date_update(self):
         self.table.new_item(hash_key='Test', attrs=self.TEST).put()
@@ -187,6 +188,7 @@ class TestMEMon(unittest.TestCase):
         self.assertEquals(PeriodType.Fixed, event['Type'])
         self.assertEquals('desc2', event['Description'])
         self.assertEquals(int(date.strftime('%s')), event['NextBlockTime'])
+        self.assertEquals(event['NextBlockTime'] - event['Period'], event['LastBlockTime'])
 
     def test_config_time_update(self):
         self.table.new_item(hash_key='Test', attrs=self.TEST).put()

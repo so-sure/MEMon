@@ -268,6 +268,7 @@ class MEMon(object):
                 event[Schema.Description] = description
             if set_date:
                 event[Schema.NextBlockTime] = int(date.strftime('%s'))
+                event[Schema.LastBlockTime] = int(date.strftime('%s')) - event[Schema.Period]
 
             event.save()
         except boto.dynamodb.exceptions.DynamoDBValidationError as v_err:
@@ -291,6 +292,7 @@ class MEMon(object):
                 data[Schema.Description] = description
             if set_date:
                 data[Schema.NextBlockTime] = int(date.strftime('%s'))
+                data[Schema.LastBlockTime] = int(date.strftime('%s')) - period
 
             print data
 
