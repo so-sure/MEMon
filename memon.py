@@ -108,7 +108,8 @@ class MEMon(object):
                 try:
                     if not event[Schema.Enabled]:
                         print "***DISABLED***"
-                    if event[Schema.ErrorCount] > 0:
+                    if (Schema.ErrorCount in event and
+                            event[Schema.ErrorCount] > 0):
                         print ("***ERRORS (%d)***" %
                                (event[Schema.ErrorCount]))
                     if Schema.Description in event:
@@ -145,11 +146,14 @@ class MEMon(object):
                 if self.debug:
                     print "%s\n---" % (event[Schema.Name])
                     self.pp.pprint(dict(event))
-                if event[Schema.ErrorCount] < int(self.max_notify_count):
+                error_count = 0
+                if Schema.ErrorCount in event and event[Schema.ErrorCount]:
+                    error_count = event[Schema.ErrorCount]
+                if error_count < int(self.max_notify_count):
                     self.notify(event[Schema.Name], Notification.Down, event)
                 elif self.debug:
                     print "Exceeded notify count for %s" % (event[Schema.Name])
-                event[Schema.ErrorCount] = event[Schema.ErrorCount] + 1
+                event[Schema.ErrorCount] = error_count + 1
                 event.save()
 
     def get_topic_arn(self):
