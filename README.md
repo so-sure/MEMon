@@ -62,17 +62,19 @@ crontab
 
 DynamoDb Schema
 --
-* HashKey (string): Name
-* (int): error_count (# of notifications sent)
-* (int): expected (time (epoch) of when the next run should be completed by = time + period)
-* (int): period (how often the process is expected to run in seconds)
-* (int): time (last successfully time (epoch) ran)
+* HashKey (string)Name : unique name of the process
+* (string)Description : optional description
+* (int)Enabled : disabled tasks will not be alerted on
+* (int)ErrorCount : number of times the event has errored (will reset on success)
+* (int)Period : number of seconds inbetween expected event runs
+* (string)Type : 'rolling' where a success will add period, or 'fixed' where the event is supposed to run at a set time
+* (int)LastBlockTime : epoch of last run (rolling = last success, fixed = last supposed run)
+* (int)NextBlockTime : epoch of next expected run
+* (int)LastSuccessTime : epoch of last successful run
 
 Future work
 --
-* improve schema names
 * Improve the error messages
-* Support processes that need to be run on a set scheduled (e.g. 8am every day)
 * Add basic reporting over a timeperiod (weekly/monthly) on events. # of failures in period, last failure
 * A web component to view and edit the dynamodb data
 * An additional optional history dynamodb table to display nice graphs for the web component
