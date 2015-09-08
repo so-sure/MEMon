@@ -245,6 +245,15 @@ class MEMon(object):
 
     def config(self, name, period, enabled, event_type=None,
                description=None, initial_date=None, initial_time=None):
+        set_date = False
+        date = datetime.datetime.now().date()
+        if not initial_date is None:
+            date = initial_date
+            print date
+            set_date = True
+        if not initial_time is None:
+            date = datetime.datetime.combine(date, initial_time)
+            set_date = True
         try:
             event = self.table.get_item(hash_key=name)
             if self.debug:
@@ -257,16 +266,6 @@ class MEMon(object):
                 event[Schema.Type] = event_type
             if not description is None:
                 event[Schema.Description] = description
-
-            set_date = False
-            date = datetime.datetime.now().date()
-            if not initial_date is None:
-                date = initial_date
-                print date
-                set_date = True
-            if not initial_time is None:
-                date = datetime.datetime.combine(date, initial_time)
-                set_date = True
             if set_date:
                 event[Schema.NextBlockTime] = int(date.strftime('%s'))
 
@@ -290,6 +289,8 @@ class MEMon(object):
             }
             if description:
                 data[Schema.Description] = description
+            if set_date:
+                data[Schema.NextBlockTime] = int(date.strftime('%s'))
 
             print data
 

@@ -124,16 +124,19 @@ class TestMEMon(unittest.TestCase):
         return str(parse_qs(last_request.body.decode('utf-8'))['Message'])
 
     def test_config_create(self):
-        self.table.new_item(hash_key='Rolling', attrs=self.ROLLING).put()
-
-        self.memon.config('newName', 1, True, PeriodType.Rolling, 'desc')
+        date = datetime.date(2010, 1, 1)
+        time = datetime.time(01, 02)
+        dt = datetime.datetime.combine(date, time)
+        self.memon.config('newName', 1, True, PeriodType.Fixed,
+                          'desc', date, time)
 
         event = self.table.get_item(hash_key='newName')
         self.assertEquals(1, event['Period'])
         self.assertEquals(True, event['Enabled'])
-        self.assertEquals(PeriodType.Rolling, event['Type'])
+        self.assertEquals(PeriodType.Fixed, event['Type'])
         self.assertEquals('desc', event['Description'])
         self.assertEquals(0, event['ErrorCount'])
+        self.assertEquals(int(dt.strftime('%s')), event['NextBlockTime'])
 
     def test_config_partial_update(self):
         self.table.new_item(hash_key='Test', attrs=self.TEST).put()
