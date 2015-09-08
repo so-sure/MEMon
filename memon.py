@@ -137,18 +137,18 @@ class MEMon(object):
         for event in results:
             # we only want to notify based on the period,
             # so we're not notifying every minute
+            error_count = 0
+            if Schema.ErrorCount in event and event[Schema.ErrorCount]:
+                error_count = event[Schema.ErrorCount]
             next_notify = None
             if Schema.NextBlockTime in event:
                 next_notify = (event[Schema.NextBlockTime] +
-                               event[Schema.ErrorCount] * event[Schema.Period])
+                               error_count * event[Schema.Period])
             is_enabled = Schema.Enabled in event and event[Schema.Enabled]
-            if next_notify <= self.now and is_enabled:
+            if next_notify and next_notify <= self.now and is_enabled:
                 if self.debug:
                     print "%s\n---" % (event[Schema.Name])
                     self.pp.pprint(dict(event))
-                error_count = 0
-                if Schema.ErrorCount in event and event[Schema.ErrorCount]:
-                    error_count = event[Schema.ErrorCount]
                 if error_count < int(self.max_notify_count):
                     self.notify(event[Schema.Name], Notification.Down, event)
                 elif self.debug:
