@@ -358,6 +358,25 @@ class TestMEMon(unittest.TestCase):
         self.getPostMessage().should.contain('Down: Down')
 
     @mock_sns
+    def test_down_missing_errorcount_notify(self):
+        self.initSns()
+        self.table.new_item(hash_key='Blank', attrs=self.BLANK).put()
+
+        event = self.table.get_item(hash_key='Blank')
+        event['Enabled'] = 1
+        event['Type'] = 'rolling'
+        event.save()
+        self.assertTrue('ErrorCount' not in event)
+
+        self.memon.notify_down_events()
+
+        event = self.table.get_item(hash_key='Blank')
+        print event
+        self.assertEquals(1, event['ErrorCount'])
+
+        self.getPostMessage().should.contain('Down: Blank')
+
+    @mock_sns
     def test_down_period_notify(self):
         self.initSns()
         self.table.new_item(hash_key='Down', attrs=self.DOWN).put()
