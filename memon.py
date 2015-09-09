@@ -98,8 +98,6 @@ class MEMon(object):
             self.record(msg['name'], msg['time'])
             q.delete_message(result)
 
-        self.notify_down_events()
-
     def show(self, name=None):
         results = self.table.scan()
         for event in results:
@@ -401,6 +399,7 @@ class MEMon(object):
                 if self.debug:
                     print "Poll attempt %d" % (i)
                 self.poll()
+            self.notify_down_events()
         elif args.action == 'config':
             if not args.name:
                 raise Exception('Missing event name')
