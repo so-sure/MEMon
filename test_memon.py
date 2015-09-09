@@ -1,4 +1,3 @@
-#!/usr/bin/python
 import unittest
 import boto
 import datetime
