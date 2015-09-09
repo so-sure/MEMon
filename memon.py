@@ -253,6 +253,9 @@ class MEMon(object):
             print date
             set_date = True
         if not initial_time is None:
+            # Add 1 day if earlier time to avoid initial alerts for new events
+            if datetime.datetime.now().time() > initial_time:
+                date = date + datetime.timedelta(days=1)
             date = datetime.datetime.combine(date, initial_time)
             set_date = True
         try:

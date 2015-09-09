@@ -125,7 +125,7 @@ class TestMEMon(unittest.TestCase):
 
     def test_config_create(self):
         date = datetime.date(2010, 1, 1)
-        time = datetime.time(01, 02)
+        time = datetime.time(23, 59)
         dt = datetime.datetime.combine(date, time)
         self.memon.config('newName', 1, True, PeriodType.Fixed,
                           'desc', date, time)
@@ -162,7 +162,7 @@ class TestMEMon(unittest.TestCase):
         self.table.new_item(hash_key='Test', attrs=self.TEST).put()
 
         date = datetime.date(2010, 1, 1)
-        time = datetime.time(01, 02)
+        time = datetime.time(23, 59)
         dt = datetime.datetime.combine(date, time)
         self.memon.config('Test', 3, False, PeriodType.Fixed,
                           'desc2', date, time)
@@ -192,12 +192,37 @@ class TestMEMon(unittest.TestCase):
         self.assertEquals(event['NextBlockTime'] - event['Period'],
                           event['LastBlockTime'])
 
-    def test_config_time_update(self):
+    def test_config_time_later_today_update(self):
         self.table.new_item(hash_key='Test', attrs=self.TEST).put()
 
         today = datetime.datetime.now().date()
-        time = datetime.time(01, 02)
+        time = datetime.time(23, 59)
+
+        # fail if exactly midnight
+        self.assertNotEquals(datetime.datetime.now().time(), time)
+
         dt = datetime.datetime.combine(today, time)
+        self.memon.config('Test', 3, False, PeriodType.Fixed,
+                          'desc2', None, time)
+
+        event = self.table.get_item(hash_key='Test')
+        self.assertEquals(3, event['Period'])
+        self.assertEquals(False, event['Enabled'])
+        self.assertEquals(PeriodType.Fixed, event['Type'])
+        self.assertEquals('desc2', event['Description'])
+        self.assertEquals(int(dt.strftime('%s')), event['NextBlockTime'])
+
+    def test_config_time_earlier_today_update(self):
+        self.table.new_item(hash_key='Test', attrs=self.TEST).put()
+
+        today = datetime.datetime.now().date()
+        tomorrow = today + datetime.timedelta(days=1)
+        time = datetime.time(00, 00)
+
+        # fail if exactly midnight
+        self.assertNotEquals(datetime.datetime.now().time(), time)
+
+        dt = datetime.datetime.combine(tomorrow, time)
         self.memon.config('Test', 3, False, PeriodType.Fixed,
                           'desc2', None, time)
 
