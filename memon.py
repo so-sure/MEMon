@@ -9,6 +9,9 @@ from boto.dynamodb2.table import Table
 from boto.dynamodb2.fields import HashKey
 from boto.dynamodb2.fields import RangeKey
 import pprint
+import sys
+
+MEMON_VERSION = '0.0.1'
 
 
 class Notification:
@@ -266,7 +269,8 @@ class MEMon(object):
                 event[Schema.Description] = description
             if set_date:
                 event[Schema.NextBlockTime] = int(date.strftime('%s'))
-                event[Schema.LastBlockTime] = int(date.strftime('%s')) - event[Schema.Period]
+                event[Schema.LastBlockTime] = (int(date.strftime('%s')) -
+                                               event[Schema.Period])
 
             event.save()
         except boto.dynamodb.exceptions.DynamoDBValidationError as v_err:
@@ -371,7 +375,8 @@ class MEMon(object):
                             help='Config only - enable/disable event')
         parser.set_defaults(enabled=True)
         parser.add_argument('action',
-                            choices=['init', 'send', 'poll', 'config', 'show'],
+                            choices=['init', 'send', 'poll',
+                                     'config', 'show', 'version'],
                             help='Action to perform')
         parser.add_argument('name',
                             nargs='?',
@@ -386,7 +391,8 @@ class MEMon(object):
         self.max_notify_count = args.max_notify_count
 
         if args.action == 'init':
-            return self.aws_init()
+            self.aws_init()
+            sys.exit(0)
 
         # get_table needs to be after init or init will fail
         self.table = self.db.get_table(self.table_name)
@@ -416,6 +422,9 @@ class MEMon(object):
                         args.initial_time)
         elif args.action == 'show':
             self.show()
+        elif args.action == 'version':
+            print "MEMon Version %s" % (MEMON_VERSION)
+            sys.exit(0)
         else:
             raise Exception('Unknown action')
 
