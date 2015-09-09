@@ -101,9 +101,16 @@ class MEMon(object):
             self.record(msg['name'], msg['time'])
             q.delete_message(result)
 
-    def show(self, name=None):
-        results = self.table.scan()
+    def show(self, name=None, error_only=False):
+        results = sorted(list(self.table.scan()), key=(
+            lambda event:
+            int(event[Schema.NextBlockTime]) if Schema.NextBlockTime in event
+            else 0))
         for event in results:
+            if (error_only and
+                (not Schema.ErrorCount in event or
+                 event[Schema.ErrorCount] == 0)):
+                continue
             if name is None or name == event[Schema.Name]:
                 print "\n%s\n---" % (event[Schema.Name])
                 try:
@@ -337,6 +344,7 @@ class MEMon(object):
         parser.set_defaults(server_time=True)
         parser.add_argument('--debug',
                             default=False,
+                            action='store_true',
                             help='Print debug statements')
         parser.add_argument('--max-notify-count',
                             type=int,
@@ -371,11 +379,15 @@ class MEMon(object):
         parser.add_argument('--enabled',
                             dest='enabled',
                             action='store_true',
-                            help='Config only - enable/disable event')
+                            help='Config only: enable/disable event')
         parser.add_argument('--disabled',
                             dest='enabled',
                             action='store_false',
-                            help='Config only - enable/disable event')
+                            help='Config only: enable/disable event')
+        parser.add_argument('--only-errors',
+                            default=False,
+                            action='store_true',
+                            help='Show only: Only show events in error')
         parser.set_defaults(enabled=True)
         parser.add_argument('action',
                             choices=['init', 'send', 'poll',
@@ -424,7 +436,7 @@ class MEMon(object):
                         args.initial_date,
                         args.initial_time)
         elif args.action == 'show':
-            self.show()
+            self.show(args.name, args.only_errors)
         elif args.action == 'version':
             print "MEMon Version %s" % (MEMON_VERSION)
             sys.exit(0)
