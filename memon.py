@@ -379,8 +379,6 @@ class MEMon(object):
 
         args = parser.parse_args()
         self.table_name = args.table
-        print args.table
-        self.table = self.db.get_table(self.table_name)
         self.queue = args.queue
         self.sns = args.sns
         self.sns_email = args.sns_email
@@ -388,8 +386,12 @@ class MEMon(object):
         self.max_notify_count = args.max_notify_count
 
         if args.action == 'init':
-            self.aws_init()
-        elif args.action == 'send':
+            return self.aws_init()
+
+        # get_table needs to be after init or init will fail
+        self.table = self.db.get_table(self.table_name)
+
+        if args.action == 'send':
             if not args.name:
                 raise Exception('Missing event name')
 
