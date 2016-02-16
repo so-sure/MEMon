@@ -318,6 +318,9 @@ class MEMon(object):
     def main(self):
 
         parser = argparse.ArgumentParser(description='Missing Event Monitor')
+        parser.add_argument('--region',
+                            default='us-east-1',
+                            help=('Region to use (default: %(default)s)'))
         parser.add_argument('--queue',
                             default=self.queue,
                             help='MEMon SQS Name (default: %(default)s)')
@@ -404,6 +407,11 @@ class MEMon(object):
         self.sns_email = args.sns_email
         self.debug = args.debug
         self.max_notify_count = args.max_notify_count
+
+        # set region
+        self.db = boto.dynamodb.connect_to_region(args.region)
+        self.sqs = boto.sqs.connect_to_region(args.region)
+        self.sns_conn = boto.sns.connect_to_region(args.region)
 
         if args.action == 'init':
             self.aws_init()
