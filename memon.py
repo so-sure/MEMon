@@ -166,12 +166,15 @@ class MEMon(object):
 
     def get_topic_arn(self):
         # todo: handle pagination of topics
-        all_topics = self.sns_conn.get_all_topics()
-        topics = all_topics['ListTopicsResponse']['ListTopicsResult']['Topics']
-        for topic in topics:
-            if topic['TopicArn'].endswith(':' + self.sns):
-                # todo: cache arn
-                return topic['TopicArn']
+        next_token = None
+        while True:
+            all_topics = self.sns_conn.get_all_topics(next_token)
+            next_token = all_topics['ListTopicsResponse']['ListTopicsResult']['NextToken']
+            topics = all_topics['ListTopicsResponse']['ListTopicsResult']['Topics']
+            for topic in topics:
+                if topic['TopicArn'].endswith(':' + self.sns):
+                    # todo: cache arn
+                    return topic['TopicArn']
 
         raise Exception('Unable to locate topic arn for %s' % (self.sns))
 
